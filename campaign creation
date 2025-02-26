@@ -1,0 +1,389 @@
+import requests
+import json
+import pandas as pd
+from collections import defaultdict
+import os
+from datetime import datetime
+from datetime import datetime,timedelta
+import time
+
+excel_file = r"C:\Users\Gopal\Desktop\blinki_automate\Blinkit\campaign_creation.xlsx"
+# python blinkit_campaign_creation.py
+# cd "C:\Users\Gopal\Desktop\blinkit_apis"
+input_df=pd.read_excel(excel_file,sheet_name='duplicate') # for duplicate
+cities_df=pd.read_excel(excel_file,sheet_name='cities')
+
+
+cities_dict={}
+
+
+for row in range(len(cities_df)):
+    if cities_df['REGION'][row] not in cities_dict:
+        cities_dict[cities_df['REGION'][row]]=[]
+    cities_dict[cities_df['REGION'][row]].append(int(cities_df['Cities id'][row]))
+    
+
+output_df=input_df.copy()
+output_df['status']='no'
+output_df['clone id']=''
+       
+    
+headers = {
+ 
+    'firebase_user_token': "eyJhbGciOiJSUzI1NiIsImtpZCI6IjBjYmJiZDI2NjNhY2U4OTU4YTFhOTY4ZmZjNDQxN2U4MDEyYmVmYmUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3NDA0NjI5OTMsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTc0MDQ2NzM0MiwiZXhwIjoxNzQwNDcwOTQyLCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.KWbFYw4BPpTjQYT8uoKT1fR57PiOzrWl29sWjdIoi6-deJ__FtCFwLXbpAFKrjqRwUJ8IZo-lmjsddz9xXeK3gUq_2CSuSMy12MjP6HzflYD6QU0mTJqksRfiauCQouXIvMdVZYpltOcKUX2du5o2TS68sDPd1SAeZuYU9TYSIe1O3-JWHsuObDBLRDoajCCwCBOmf1ffx9bNvqX0sIWUysjZhfA0XSZ29NoOOQ28A48zxK8g6NabPjARfbsV2G4pJDHSv-wWDQ_Z_f4S93ZYZBAJOQLyhWQW_ehJO_h4qXEARGdlaJdldLGPWH7xK6oTO1m2HhmSeJ_WGyqCmA8LA",
+    'Content-Type': 'application/json;charset=UTF-8',  # Specify that you're sending JSON data
+    'Accept': 'application/json, text/plain, */*',  # Acceptable response formats
+    'Accept-Encoding': 'gzip, deflate, br, zstd',  # Specify acceptable encoding types
+    'Accept-Language': 'en-US,en;q=0.9',  # Specify the preferred language for the response
+    'Cookie': '_gcl_au=1.1.1181155482.1732784451; _fbp=fb.1.1732784451606.140974982100152449; _gcl_aw=GCL.1733221409.CjwKCAiA9bq6BhAKEiwAH6bqoLp4r9Yb4nxwY5rT_uQpZoAU92UvTlGZdNatzGQ7Dc8CpiWKcwLgaRoCjWgQAvD_BwE; _gcl_gs=2.1.k1$i1733221406$u260607710; _gac_UA-85989319-1=1.1733221409.CjwKCAiA9bq6BhAKEiwAH6bqoLp4r9Yb4nxwY5rT_uQpZoAU92UvTlGZdNatzGQ7Dc8CpiWKcwLgaRoCjWgQAvD_BwE; _ga=GA1.1.623208161.1732784451; _ga_DDJ0134H6Z=GS1.2.1733382226.8.0.1733382226.60.0.0; _ga_JSMJG966C7=GS1.1.1733382225.11.1.1733382236.49.0.0; __cfruid=db930cdd6e4f4305a15597842b45903384f4b703-1736432386; _cfuvid=B3uwkJHf25XKcU7XFBMbj5C8KMmZ_tTcxvytKqq3P3c-1736432386427-0.0.1.1-604800000; __cf_bm=a1Tyz94f3xsqIf.02n7r2WjnrvL6MjZOwlGVVeXx3U8-1736440236-1.0.1.1-6hcw46ilzrC4UM5Sb4Lv9Q4SE8OIBtGbrs4SYfG58MOoRNJqSk_Ak9OjxEIEZg4aT7UswGdQQtQVvUshIHw8jA',  # Include all relevant cookies
+    'x-gr-trace-id': 'baelish=17ab2f4c-cea7-11ef-b2f3-8a273723ae0d',  # Trace ID for debugging purposes (optional)
+    'x-powered-by': 'Express',  # Indicating the server software
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',  # User-Agent string
+    'Origin': 'https://brands.blinkit.com',  # Origin of the request
+    'Referer': 'https://brands.blinkit.com/diy/list',  # Referer URL (the page the request originated from)
+    'Sec-CH-UA': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',  # Client hints for the browser
+    'Sec-CH-UA-Mobile': '?0',  # Whether the client is on mobile or not
+    'Sec-CH-UA-Platform': '"Windows"',  # Platform being used (Windows in this case)
+    'Sec-Fetch-Dest': 'empty',  # Fetch destination
+    'Sec-Fetch-Mode': 'cors',  # Cross-origin resource sharing (CORS) mode
+    'Sec-Fetch-Site': 'same-origin',  # Origin of the request
+}
+
+cnt=0
+for row in range(len(input_df)):      
+    if cnt==35:
+      time.sleep(30)
+      cnt=0
+    
+    cnt+=1
+    try:   
+         
+         id=int(input_df['Original Campaign id'][row])
+         campaign_id=int(input_df['Original Campaign id'][row])
+         print(campaign_id)
+         url=f"https://brands.blinkit.com/adservice/v1/campaigns/{id}"
+         response = requests.get(url, headers=headers)
+         response_data=response.json()
+         
+         if response.status_code!=200:
+           print(response.status_code,response.text)
+           continue
+           
+         product_ids= input_df['Clone Product ids'][row]
+         clone_campaign_name=input_df['Clone Campaign Name'][row]
+         url_campaign ="https://brands.blinkit.com/adservice/v3/campaigns"
+       
+         
+         if input_df['Clone Campaign Name'][row].split('|')[0].strip()=="CAT":
+              
+              print("category campaign it is final name is ", input_df['Clone Campaign Name'][row] )
+              
+              
+              """
+              cat_id=[]
+              
+              for item in  response_data["data"]["campaign"]["categories"]:
+                  dict1={ "category_id":item["category_id"],
+                          "category_name":item["category_name"],
+                          "bidding_strategy": {
+                              "cpm": item["bidding_strategy"]['cpm'],
+                              "max_boost":None
+                              },
+                          "is_category_enabled": item["is_category_enabled"]
+                          
+                          }
+                  cat_id.append(dict1)"""
+               
+              data_cat ={
+                         "source_platform": "diy_dashboard_web",
+                         "requested_by": "quickcommerce@powerhouse91.com",
+                         "advertiser_id": 390,
+                         "brand_name": "PH91 Pvt. Ltd",
+                         
+                         "objective_type": response_data["data"]["campaign"]["objective_type"],
+                         
+                         "asset_type":  response_data["data"]["campaign"]["campaign_type"],
+                         'image_url':"",
+                         "header_title":  response_data["data"]["campaign"]["header_title"],
+                         "creative_type": response_data["data"]["campaign"]["creative_type"],
+                         'brand_ids':  str(response_data["data"]["campaign"]["brands_ids"]),
+                         "highlighted_pids": str(product_ids),
+                         "collection_id": response_data["data"]["campaign"]["collection_id"],
+                         "brand_page_id": response_data["data"]["campaign"]["brand_page_id"],
+                         "store_name":"",
+                         "campaign_data": {
+                           "pids": str(product_ids),
+                           "products": [
+                             {
+                               "id": int(product_ids),
+                               "is_star_product": False
+                             }
+                           ],
+                           "brand_ids":  str(response_data["data"]["campaign"]["brands_ids"]),
+                           "category_ids": str(response_data["data"]["campaign"]["category_ids"])
+                         },
+                         "campaign_start": datetime.today().strftime("%m/%d/%Y").lstrip('0').replace('/0', '/'),
+                         #"campaign_end": (datetime.today()+timedelta(days=30)).strftime("%m/%d/%Y").lstrip('0').replace('/0', '/'),
+                        "campaign_end":  "12/31/9999",
+                         "infinite_campaign": True,
+                         "cpm": 0,
+                         "name":  clone_campaign_name,
+                         "bidding_strategy": {
+                           #"total_budget": response_data["data"]["campaign"]["campaign_budget"],
+                           "total_budget": 1000,
+                           "pacing_type": "DAILY"
+                         },
+                         "campaign_targeting": {
+                           "city_ids": ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]),
+                            "negative_keywords": [],
+                            "category_targeting": {"categories":response_data["data"]["campaign"]["categories"]}
+                         
+                         },
+                         #"campaign_request_type": "CREATE"
+                         "campaign_request_type": "RESTART"
+                         }
+              
+              #response_campaign=requests.post(url_campaign, headers=headers, json=data_cat)
+              esponse_campaign=requests.put(url_campaign, headers=headers, json=data_cat)
+              if response_campaign.status_code == 200:
+                  print("campaign created  successfully")
+              else:
+                  print("error in response_campaign ",response_campaign.status_code,response_campaign.text)
+                  message ="response_camp_raw " + response_campaign.status_code + response_campaign.text
+                  output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = message
+                  continue
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = "successfull" 
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'clone id'] = response_campaign.json()['data']['campaign_id']
+         
+         
+         
+      
+         if (input_df['Clone Campaign Name'][row].split('|')[0].strip()=="GEN" or input_df['Clone Campaign Name'][row].split('|')[0].strip()=="COMP" or input_df['Clone Campaign Name'][row].split('|')[0].strip()=="BRAND" or input_df['Clone Campaign Name'][row].split('|')[0].strip()=="RANK"):  
+              print("Generic campaign it is final name is ", clone_campaign_name )
+              print("product ids are ", product_ids)
+              #print("cities ids are ",cities_dict[((clone_campaign_name).split('|')[3]).strip()])            
+              """
+              print("Key: source_platform, Value: diy_dashboard_web")
+              print("Key: requested_by, Value: quickcommerce@powerhouse91.com")
+              print("Key: advertiser_id, Value: 390")
+              print("Key: brand_name, Value: PH91 Pvt. Ltd")
+              print(f"Key: objective_type, Value: {response_data['data']['campaign']['objective_type']}")
+              print(f"Key: asset_type, Value: {response_data['data']['campaign']['campaign_type']}")
+              print(f"Key: header_title, Value: {response_data['data']['campaign']['header_title']}")
+              print(f"Key: creative_type, Value: {response_data['data']['campaign']['creative_type']}")
+              print(f"Key: highlighted_pids, Value: {""}")
+              print(f"Key: collection_id, Value: {response_data['data']['campaign']['collection_id']}")
+              print(f"Key: brand_page_id, Value: {response_data['data']['campaign']['brand_page_id']}")
+              print(f"Key: campaign_data, Value: { {'pids': str(product_ids), 'products': [ {'id': int(product_ids), 'is_star_product': False} ], 'brand_ids': str(response_data['data']['campaign']['brand_ids'][0]), 'category_ids': None } }")
+              print(f"Key: campaign_start, Value: {datetime.today().strftime('%m/%d/%Y').lstrip('0').replace('/0', '/')}") 
+              print(f"Key: campaign_end, Value: {(datetime.today() + timedelta(days=30)).strftime('%m/%d/%Y').lstrip('0').replace('/0', '/')}")
+              print("Key: infinite_campaign, Value: True")
+              print("Key: cpm, Value: 0")
+              print(f"Key: name, Value: {clone_campaign_name}")
+              print(f"Key: bidding_strategy, Value: { {'total_budget': response_data['data']['campaign']['campaign_budget'], 'pacing_type': 'DAILY' } }")
+              print(f"Key: campaign_targeting, Value: { {'city_ids': ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]), 'keyword_targeting': {'keywords': response_data['data']['campaign']['keywords']} } }")
+              print("Key: campaign_request_type, Value: CREATE")"""
+
+              data_campaign ={
+                         "source_platform": "diy_dashboard_web",
+                         "requested_by": "quickcommerce@powerhouse91.com",
+                         "advertiser_id": 390,
+                         "brand_name": "PH91 Pvt. Ltd",
+                         
+                         "objective_type": response_data["data"]["campaign"]["objective_type"],
+                         
+                         "asset_type":  response_data["data"]["campaign"]["campaign_type"],
+                         "header_title":  response_data["data"]["campaign"]["header_title"],
+                         "creative_type": response_data["data"]["campaign"]["creative_type"],
+                         "highlighted_pids":"",
+                         "collection_id": response_data["data"]["campaign"]["collection_id"],
+                         "brand_page_id": response_data["data"]["campaign"]["brand_page_id"],
+                         "campaign_data": {
+                           "pids": str(product_ids),
+                           "products": [
+                             {
+                               "id": int(product_ids),
+                               "is_star_product": False
+                             }
+                           ],
+                           "brand_ids":  str(response_data["data"]["campaign"]["brand_ids"][0]),
+                           "category_ids": None
+                         },
+                         "campaign_start": datetime.today().strftime("%m/%d/%Y").lstrip('0').replace('/0', '/'),
+                         #"campaign_end": (datetime.today()+timedelta(days=30)).strftime("%m/%d/%Y").lstrip('0').replace('/0', '/'),
+                         "campaign_end":  "12/31/9999",
+                         "infinite_campaign": True,
+                         "cpm": 0,
+                         "name":  clone_campaign_name,
+                         "bidding_strategy": {
+                           #"total_budget": response_data["data"]["campaign"]["campaign_budget"],
+                           "total_budget": 1000,
+                           "pacing_type": "DAILY"
+                         },
+                         "campaign_targeting": {
+                           "city_ids": ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]),
+                           "keyword_targeting": {"keywords":response_data["data"]["campaign"]["keywords"]}
+                         
+                         
+                         },
+                         #"campaign_request_type": "CREATE"
+                         "campaign_request_type": "RESTART"
+                         }
+    
+        
+              #response_campaign=requests.post(url_campaign, headers=headers, json=data_campaign)
+              response_campaign=requests.put(url_campaign, headers=headers, json=data_campaign)
+              if response_campaign.status_code == 200:
+                  print("campaign created  successfully ")
+              else:
+                  print("error in response_campaign ",response_campaign.status_code,response_campaign.text)
+                  message ="response_camp_raw " + response_campaign.status_code + response_campaign.text
+                  output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = message
+                  continue
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = "successfull"
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'clone id'] = response_campaign.json()['data']['campaign_id']
+               
+         
+         
+         
+         
+      
+         
+         if input_df['Clone Campaign Name'][row].split('|')[0].strip()=="RECOM":  
+              
+              print(input_df['Clone Campaign Name'][row][1].strip())
+              if (input_df['Clone Campaign Name'][row][1].strip()=="SANITARY PADS" or input_df['Clone Campaign Name'][row][1].strip()=="XXXL PADS" or input_df['Clone Campaign Name'][row][1].strip()=="DISPOSABLE PERIOD PANTY" or input_df['Clone Campaign Name'][row][1].strip()=="HAIR REMOVAL SPRAY" or input_df['Clone Campaign Name'][row][1].strip()=="BODY WAX POWDER") :  
+                    dict1={
+                                   "city_ids": ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]),
+                                   #"recommendation": {"bidding_strategy": {"cpm": 201}},
+                                   "repeat_order_suggestion": {"bidding_strategy": {"cpm": 201}},
+                                   "next_product_recommendation": {"bidding_strategy": {"cpm": 351}} } 
+              
+              elif (input_df['Clone Campaign Name'][row][1].strip()=="MANUAL FACE RAZOR" or input_df['Clone Campaign Name'][row][1].strip()=="BODY RAZOR" ) :  
+                    dict1={
+                                   "city_ids": ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]),
+                                   "recommendation": {"bidding_strategy": {"cpm": 201}},
+                                   "repeat_order_suggestion": {"bidding_strategy": {"cpm": 201}},
+                                   "next_product_recommendation": {"bidding_strategy": {"cpm": 351}} }
+              
+              else:
+                
+                    dict1={
+                                   "city_ids": ','.join([ str(x) for x in cities_dict[((clone_campaign_name).split('|')[3]).strip()] ]),
+                                   #"recommendation": {"bidding_strategy": {"cpm": 201}},
+                                   #"repeat_order_suggestion": {"bidding_strategy": {"cpm": 401}},
+                                   "next_product_recommendation": {"bidding_strategy": {"cpm": 501}} }        
+                
+              
+              print("original name is ",response_data["data"]["campaign"]["name"])
+              
+              
+              data_campaign ={
+                                 "source_platform": "diy_dashboard_web",
+                                 "requested_by": "quickcommerce@powerhouse91.com",
+                                 "advertiser_id": 390,
+                                 "brand_name": "PH91 Pvt. Ltd",
+                                 #"campaign_id": campaign_id,
+                                 "objective_type":  "PERFORMANCE",
+                                 "asset_type":  "PRODUCT_RECOMMENDATION",
+                                 "image_url": "",
+                                 "header_title": "",
+                                 "creative_type": "",
+                                 "pids":  str(product_ids),
+                                 "brand_ids": "",
+                                 "highlighted_pids": "",
+                                 "collection_id": "",
+                                 "store_name": "",
+                                 "campaign_start": datetime.today().strftime("%m/%d/%Y").lstrip('0').replace('/0', '/'),
+                                 "campaign_end": "12/31/9999",
+                                 "infinite_campaign": True,
+                                 "cpm": 0,
+                                 "name":  clone_campaign_name,
+                                 "bidding_strategy": {
+                                   "total_budget": 1000,
+                                   "pacing_type": "DAILY"
+                                 },
+                                 "campaign_targeting": dict1,
+                                 
+                                 #"campaign_request_type": "CREATE",
+                                 "campaign_request_type": "RESTART",
+                                 "campaign_data": {
+                                   "pids":   str(product_ids)
+                                 }}                               
+
+    
+              print("jai")
+              #response_campaign=requests.post(url_campaign, headers=headers, json=data_campaign)
+              response_campaign=requests.put(url_campaign, headers=headers, json=data_campaign)
+              print(response_campaign.status_code,response_campaign.text)
+              if response_campaign.status_code == 200:
+                  print("campaign created  successfully")
+              else:
+                  print("error in response_campaign ",response_campaign.status_code,response_campaign.text)
+                  message ="response_camp_raw " + response_campaign.status_code + response_campaign.text
+                  output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = message
+                  continue
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'status'] = "successfull" 
+              output_df.loc[output_df['Clone Campaign Name'] == clone_campaign_name, 'clone id'] = response_campaign.json()['data']['campaign_id']
+    
+    
+    except:
+        continue
+      
+
+with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        output_df.to_excel(writer,sheet_name='output_report',index=False)                
+
+         
+      
+                
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
