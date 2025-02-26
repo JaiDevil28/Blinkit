@@ -1,0 +1,545 @@
+import requests
+import json
+import pandas as pd
+from collections import defaultdict
+import os
+from datetime import datetime
+
+
+excel_file = r"C:\Users\Gopal\Desktop\blinki_automate\Blinkit\blinkit_all.xlsx"
+                                                                            
+# python blinkit_all.py
+# cd "C:\Users\Gopal\Desktop\blinkit_apis"
+input_df=pd.read_excel(excel_file,sheet_name='input_bid_optimisation')  # for budget change
+#input_df=pd.read_excel(excel_file,sheet_name='budget_change')
+input_dict={}
+
+#input_df['Campaign Id']=input_df['Campaign Id'].astype(float)
+
+for row in range(len(input_df)):
+    if pd.isna(input_df['Campaign Id'][row]):
+        print("NaN found at row", row, "- breaking loop")
+        break
+    campaign_id = int(input_df['Campaign Id'][row])
+    target = input_df['Target'][row].strip()
+    value = int(input_df['Value'][row])
+    campaign_name=str(input_df['Campaign Name'][row])
+    if campaign_id not in input_dict:
+        input_dict[campaign_id] = {'keyword': [], 'bid': [],'Campaign Name':''}
+    input_dict[campaign_id]['keyword'].append(target)
+    input_dict[campaign_id]['bid'].append(value) 
+    input_dict[campaign_id]['Campaign Name']=campaign_name
+output_df=input_df.copy()
+output_df['status']='no'
+
+
+# for city addition
+"""
+for row in range(len(input_df)):
+    if pd.isna(input_df['Campaign Id'][row]):
+        print("NaN found at row", row, "- breaking loop")
+        break
+    campaign_id = int(input_df['Campaign Id'][row])
+    target = str(input_df['Target'][row])
+    for city_id in target.split('#'):
+        if campaign_id not in input_dict:
+            input_dict[campaign_id] = {'city': []}
+        input_dict[campaign_id]['city'].append(city_id)"""
+       
+output_df=input_df.copy()
+output_df['status']='no'
+#output_df=optimization(input_dict,output_df) 
+#with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a',if_sheet_exists='replace') as writer:
+#            output_df.to_excel(writer, sheet_name='output', index=False)
+
+keyword_report=[]
+url = "https://brands.blinkit.com/adservice/v1/advertisers/campaigns"
+
+
+#"eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwZDg4ZGQ1NWQxYjAwZDg0ZWU4MWQwYjk2M2RlNGNkOGM0ZmFjM2UiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3MzY0MzI0MTQsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTczNjQzNzk2NywiZXhwIjoxNzM2NDQxNTY3LCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.aHCUozFHP5nADHYz80zF9icxGmI_m1w_LYNR3O6V0ZcvptFxVmdFPEefP0Ns3SbZgQOFTsW5NDshSB22KTOnY4dFDeVaBcqzxLpaT3r2Kjx_2j0XKTbBDhjwbjRdq2jOGfF4eBlAEoxY2Mi_eAkaHtLjijIYjEtmiRK9rLV81jUlBKsMRLOcrnUXj9WLTQeGyos6Vgk7Qo8DSDwTIC2-Mc3QKXJos4CGpbhwVF3tKyyxEAToctXj28py5_YTu_vH5_qdt1hv9ESDTksFatAdlx91z7clf2xDx75R57GpK1qInaihGXzxPIzdqrVJIfm0iJlQ3Hexlh2Hx9nluoSyTQ"
+    
+headers = {
+    #'Authorization': "eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwZDg4ZGQ1NWQxYjAwZDg0ZWU4MWQwYjk2M2RlNGNkOGM0ZmFjM2UiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3MzY0MzI0MTQsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTczNjQ0MjM4MiwiZXhwIjoxNzM2NDQ1OTgyLCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.d05nwENjg2QcVX9mzvKeVtYjHW8oVB4vTJVpPnhp8RmCUHsfMOCVfp0URJrx57FzCemNP98B1igCnyQ48BlkDSCVIpGa_iVf662fyPMVTFz9WUknJmwG7bq_OL7Gu7al4zDsx2zaV_nsnLm3rWVEEYdvHqeafGwM3Y4jbW77HtJL91tqSr7SQeB_VBxWzT_g00jDHDL68YxVh6KoELbRLkXX1m1VXK2j_vRWfOpwazWQGj_YajnkVCN09U7gapcsFAOD1AESBx4KuFibszkiFZojYhYjuyXf_1UeFKmCiz6F6Vc0rZ4CQT0tyn82bZc3TMRg_stcAJGdAGBuFnDHWA",
+    
+    #'firebase_user_token': "eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwZDg4ZGQ1NWQxYjAwZDg0ZWU4MWQwYjk2M2RlNGNkOGM0ZmFjM2UiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3MzY0MzI0MTQsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTczNjQ0MjM4MiwiZXhwIjoxNzM2NDQ1OTgyLCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.d05nwENjg2QcVX9mzvKeVtYjHW8oVB4vTJVpPnhp8RmCUHsfMOCVfp0URJrx57FzCemNP98B1igCnyQ48BlkDSCVIpGa_iVf662fyPMVTFz9WUknJmwG7bq_OL7Gu7al4zDsx2zaV_nsnLm3rWVEEYdvHqeafGwM3Y4jbW77HtJL91tqSr7SQeB_VBxWzT_g00jDHDL68YxVh6KoELbRLkXX1m1VXK2j_vRWfOpwazWQGj_YajnkVCN09U7gapcsFAOD1AESBx4KuFibszkiFZojYhYjuyXf_1UeFKmCiz6F6Vc0rZ4CQT0tyn82bZc3TMRg_stcAJGdAGBuFnDHWA",
+    #'firebase_user_token': "eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwZDg4ZGQ1NWQxYjAwZDg0ZWU4MWQwYjk2M2RlNGNkOGM0ZmFjM2UiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3MzY0MzI0MTQsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTczNjQ2MjQ5NiwiZXhwIjoxNzM2NDY2MDk2LCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.nJ_lzPtJxKmcehYW6OKTRfyCwgpxCxQcAnjYYYvMq0NjDqFGN6bsXP7r23XLKjfG3EfVX8WkGjvfa3x3z9e-X-qIFSS4ZnY8GFdrSaVlVKNliupI77sJ7WuFNTQ1xPXi0vDt490zrageO2HKw9w4_2Vc8_4PCIouf8Ke0CTR7F9JGXwaIdHy40C57NN-5c-xnOlvjtAU_o8iFYpq2yBkUo3IMBAG6QsK25SQBlccFGHeH4G2uYrS1pG9m6nBa73RRCyDNkENS4HeIPQmkLXuWPpf0f3LsGdI7KFKyn_GHT2zNV8J-DEX2MFQlaohJ-JGfkE0FSwhP_kmbq5R1vspxg",
+    'firebase_user_token': "eyJhbGciOiJSUzI1NiIsImtpZCI6IjBjYmJiZDI2NjNhY2U4OTU4YTFhOTY4ZmZjNDQxN2U4MDEyYmVmYmUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vYWQtcGxhdGZvcm0tcHJvZCIsImF1ZCI6ImFkLXBsYXRmb3JtLXByb2QiLCJhdXRoX3RpbWUiOjE3NDA0NjI5OTMsInVzZXJfaWQiOiJCdFZPZUxGd1djYVhDSzlpMG5RMHRzVlFkU1UyIiwic3ViIjoiQnRWT2VMRndXY2FYQ0s5aTBuUTB0c1ZRZFNVMiIsImlhdCI6MTc0MDQ2NzM0MiwiZXhwIjoxNzQwNDcwOTQyLCJlbWFpbCI6InF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbInF1aWNrY29tbWVyY2VAcG93ZXJob3VzZTkxLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.KWbFYw4BPpTjQYT8uoKT1fR57PiOzrWl29sWjdIoi6-deJ__FtCFwLXbpAFKrjqRwUJ8IZo-lmjsddz9xXeK3gUq_2CSuSMy12MjP6HzflYD6QU0mTJqksRfiauCQouXIvMdVZYpltOcKUX2du5o2TS68sDPd1SAeZuYU9TYSIe1O3-JWHsuObDBLRDoajCCwCBOmf1ffx9bNvqX0sIWUysjZhfA0XSZ29NoOOQ28A48zxK8g6NabPjARfbsV2G4pJDHSv-wWDQ_Z_f4S93ZYZBAJOQLyhWQW_ehJO_h4qXEARGdlaJdldLGPWH7xK6oTO1m2HhmSeJ_WGyqCmA8LA",
+    'Content-Type': 'application/json;charset=UTF-8',  # Specify that you're sending JSON data
+    'Accept': 'application/json, text/plain, */*',  # Acceptable response formats
+    'Accept-Encoding': 'gzip, deflate, br, zstd',  # Specify acceptable encoding types
+    'Accept-Language': 'en-US,en;q=0.9',  # Specify the preferred language for the response
+    'Cookie': '_gcl_au=1.1.1181155482.1732784451; _fbp=fb.1.1732784451606.140974982100152449; _gcl_aw=GCL.1733221409.CjwKCAiA9bq6BhAKEiwAH6bqoLp4r9Yb4nxwY5rT_uQpZoAU92UvTlGZdNatzGQ7Dc8CpiWKcwLgaRoCjWgQAvD_BwE; _gcl_gs=2.1.k1$i1733221406$u260607710; _gac_UA-85989319-1=1.1733221409.CjwKCAiA9bq6BhAKEiwAH6bqoLp4r9Yb4nxwY5rT_uQpZoAU92UvTlGZdNatzGQ7Dc8CpiWKcwLgaRoCjWgQAvD_BwE; _ga=GA1.1.623208161.1732784451; _ga_DDJ0134H6Z=GS1.2.1733382226.8.0.1733382226.60.0.0; _ga_JSMJG966C7=GS1.1.1733382225.11.1.1733382236.49.0.0; __cfruid=db930cdd6e4f4305a15597842b45903384f4b703-1736432386; _cfuvid=B3uwkJHf25XKcU7XFBMbj5C8KMmZ_tTcxvytKqq3P3c-1736432386427-0.0.1.1-604800000; __cf_bm=a1Tyz94f3xsqIf.02n7r2WjnrvL6MjZOwlGVVeXx3U8-1736440236-1.0.1.1-6hcw46ilzrC4UM5Sb4Lv9Q4SE8OIBtGbrs4SYfG58MOoRNJqSk_Ak9OjxEIEZg4aT7UswGdQQtQVvUshIHw8jA',  # Include all relevant cookies
+    'x-gr-trace-id': 'baelish=17ab2f4c-cea7-11ef-b2f3-8a273723ae0d',  # Trace ID for debugging purposes (optional)
+    'x-powered-by': 'Express',  # Indicating the server software
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',  # User-Agent string
+    'Origin': 'https://brands.blinkit.com',  # Origin of the request
+    'Referer': 'https://brands.blinkit.com/diy/list',  # Referer URL (the page the request originated from)
+    'Sec-CH-UA': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',  # Client hints for the browser
+    'Sec-CH-UA-Mobile': '?0',  # Whether the client is on mobile or not
+    'Sec-CH-UA-Platform': '"Windows"',  # Platform being used (Windows in this case)
+    'Sec-Fetch-Dest': 'empty',  # Fetch destination
+    'Sec-Fetch-Mode': 'cors',  # Cross-origin resource sharing (CORS) mode
+    'Sec-Fetch-Site': 'same-origin',  # Origin of the request
+}
+
+# C:\Users\Gopal\Desktop\blinkit_apis
+payload ={"from_date":"12/15/2024",
+          "to_date":"2/13/2025",
+          "campaign_types":["PRODUCT_LISTING","BANNER_LISTING","PRODUCT_RECOMMENDATION","SEARCH_SUGGESTION","BRAND_BOOSTER"]}
+
+response = requests.post(url, headers=headers, json=payload)
+print(f"Response Status Code: {response.status_code}")
+#print(f"Response Headers: {response.headers}")
+#print(f"Response Body: {response.text}")
+
+#print("Check 1:", response.text)
+camp_data=[]
+campaign_data = {}
+if response.status_code == 200:
+    response_data = response.json()
+    for campaign in response_data['data']['campaigns']:
+        campaign_info = {
+            'id': campaign['id'],
+            'campaign_name': campaign['campaign_name'],
+            'campaign_type': campaign['campaign_type'],
+            'campaign_status': campaign['campaign_status'],
+            'start_ts': campaign['start_ts'],
+            'end_ts': campaign['end_ts'],
+            'infinite_campaign': campaign['infinite_campaign'],
+            'budget_consumed': campaign['budget_consumed'],
+            'impressions': campaign['impressions'],
+            'atcs': campaign['atcs'],
+            'roas': campaign['roas'],
+            'reach': campaign['reach'],
+            'updated_ts': campaign['updated_ts'],
+            'no_of_changes_scheduled': campaign['no_of_changes_scheduled'],
+         }
+        if campaign['alerts']:
+            alerts = "; ".join([f"{alert['alert_type']}: {alert['alert_message']}" for alert in campaign['alerts']])
+        else:
+            alerts = None
+        campaign_info['alerts'] = alerts
+        campaign_data[campaign['id']] = campaign_info
+        camp_data.append(campaign_info)               
+else:
+    print(f"Failed to fetch data. Status Code: {response.status_code}")
+    print(response.text)
+
+df = pd.DataFrame(camp_data)
+with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+    df.to_excel(writer, sheet_name='campaign_raw_data', index=False)
+
+
+print('total ids in input',len(input_dict.keys()))
+
+for campaign_id in input_dict.keys():      
+    
+    
+    #print("check 2" ,campaign_id)
+    """
+    url_delete=f"https://brands.blinkit.com/adservice/v1/campaigns/{campaign_id}"
+    delete_req=requests.delete(url_delete,headers=headers)
+    if delete_req.status_code==200:
+        print("campaign paused successfully")
+    else:
+        print(delete_req.status_code,delete_req.text)"""
+    
+    
+    try:   
+         
+         id=int(campaign_id)
+         #print("input dict  keywords ",input_dict[id]['keyword'])
+         try:    
+             campaign_nm=input_dict[id]['Campaign Name']
+         except: 
+             campaign_nm=campaign_data[id]['campaign_name']   
+         #print(campaign_nm,campaign_data[id]['campaign_name'])
+         print(campaign_data[id]['campaign_name'],id)
+         
+
+         url=f"https://brands.blinkit.com/adservice/v1/campaigns/{id}"
+         response = requests.get(url, headers=headers)
+         response_data=response.json()
+         
+         asset_type = response_data["data"]["campaign"]["campaign_type"]
+         highlighted_pids = ",".join([str(pid) for pid in response_data["data"]["campaign"]["highlighted_pids"]])
+         pbids = ",".join([str(pid) for pid in response_data["data"]["campaign"]["pids"]])  # Assuming pids are the same as pbids
+         category_ids = response_data["data"]["campaign"]["category_ids"]
+         total_budget = response_data["data"]["campaign"]["campaign_budget"]
+         region_ids = ",".join([str(region_id) for region_id in response_data["data"]["campaign"]["region_ids"]])
+         original_ids=region_ids
+         region_type= response_data["data"]["campaign"]["region_type"]
+         
+         # for city addition
+         """
+         try:
+             region_ids=",".join([str(x) for x in input_dict[campaign_id]['city']])
+             print("original ids are ",original_ids)
+             print("our input region_ids are ",region_ids)
+         except:
+             pass"""
+         
+         
+         #continue
+         if(region_type=="PAN_INDIA"):
+             region_ids="-1"
+        # print("region_ids ",region_ids)
+         negative_keywords = response_data["data"]["campaign"]["negative_keywords"]
+         start_date = datetime.fromisoformat(response_data["data"]["campaign"]["start_ts"])
+         campaign_start_date = start_date.strftime("%m/%d/%Y")
+         keywords_list = []
+         #keyword_attributes = keyword_attribute(,asset_type,id,headers)
+         
+         keyword_list_1=[item["keyword"] for item in response_data["data"]["campaign"]["keywords"]]
+         #print("uyes")
+         #print(input_dict[id]['keyword'])
+         """
+         for keyw1 in input_dict[id]['keyword']:
+            for keyw in keyw1.split(','): 
+             if keyw.strip() not in keyword_list_1:
+                 keyword_list_1.append(keyw.strip())"""
+         
+         campaign_type=asset_type
+         keywords = ",".join(keyword_list_1)
+         campaign_type = "PRODUCT_LISTING"
+         keyword_attributes = {}
+         try:
+            url = f"https://brands.blinkit.com/adservice/v1/campaigns/keywords/attributes?keywords={keywords}&campaign_type={campaign_type}&campaign_id={id}"
+            response = requests.get(url,headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                
+                for keyword_data in data.get("data", {}).get("keyword_attributes", []):
+                    keyword = keyword_data.get("keyword")
+                    min_in_exact = keyword_data.get("bid_range", {}).get("exact_match", {}).get("min", "N/A")
+                    min_in_smart = keyword_data.get("bid_range", {}).get("smart_match", {}).get("min", "N/A")
+                    total_searches = keyword_data.get("keyword_searches", "N/A")
+                    min_for_boost_exact = keyword_data.get("bid_range", {}).get("exact_match", {}).get("min_for_boost", "N/A")
+                    suggested_min_exact = keyword_data.get("bid_range", {}).get("exact_match", {}).get("suggested_min", "N/A")
+                    keyword_attributes[keyword] = {
+                        "min_in_exact": min_in_exact,
+                        "min_in_smart": min_in_smart,
+                        "total_searches": total_searches,
+                        "min_for_boost_exact": min_for_boost_exact,
+                        "suggested_min_exact": suggested_min_exact}       
+               # print(keyword_attributes)
+            else:
+                print(f"Failed to retrieve data error in keyword_attribute. Status code: {response.status_code}")
+                message=   "error in keyword attribute " + response.text
+                output_df.loc[output_df['Campaign Id'] == id, 'status'] = message
+                continue
+         except:
+             print("error in minimum suggested api")
+             pass
+         
+         print("Starting loop with response_data['data']['campaign']['keywords'] length:", len(response_data["data"]["campaign"]["keywords"]))
+         
+         cnt2=0    
+         for item in response_data["data"]["campaign"]["keywords"]:
+            keyword_name = item["keyword"]
+            minimimum_cpm=201
+            maximum_cpm=10000
+            try:
+                maximum_cpm=keyword_attributes[keyword_name]["suggested_min_exact"]
+            except:
+                pass    
+            try:
+                minimimum_cpm=keyword_attributes[keyword_name]['min_in_exact']
+            except:
+                pass
+            if len(item['bids']) == 1:
+                match_type = item["bids"][0]["match_type"]
+                cpm_value = item['bids'][0]['cpm']
+                
+                
+                if (keyword_name.strip()=="body wax" or keyword_name.strip()== "wax powder"):
+                    
+                    print("YES FOUND keyword is ",keyword_name,"origian value is ",cpm_value)
+                    continue
+                    
+                    if campaign_nm.split('|')[1].strip()=="GROOVE MASSAGER":
+                       cpm_value=1.55*cpm_value
+                    elif campaign_nm.split('|')[1].strip()=="VIBE MASSAGER":
+                       cpm_value=1.45*cpm_value   
+                    elif campaign_nm.split('|')[1].strip()=="MASSAGER":
+                       cpm_value=1.4*cpm_value 
+                    else:
+                        cpm_value=1.2*cpm_value    
+                       
+                    
+                    #cpm_value = input_dict[id]['bid'][input_dict[id]['keyword'].index(keyword_name)]
+                    #print("origian value is ",item['bids'][0]['cpm'], " final bid is ",max(int(cpm_value),minimimum_cpm ,201))
+                    print("YES FOUND keyword is ",keyword_name,"origian value is ",item['bids'][0]['cpm'], " final bid is ",max(int(cpm_value),minimimum_cpm ,201))
+                #else:
+                #      print("keyword is ",keyword_name,"origian value is ",item['bids'][0]['cpm'], " final bid is ",max(int(cpm_value),minimimum_cpm ,201))
+                #cpm_value=min(maximum_cpm,1000)
+                #cpm_value = max(int(cpm_value),minimimum_cpm ,201)
+                keywords_list.append({
+                    "keyword": keyword_name.strip(),
+                    "bids": [{
+                        "match_type": match_type,
+                        "cpm": cpm_value,
+                        "max_boost": item["bids"][0]["max_boost"]
+                    }]
+                })
+                keyword_report_dict = {
+                    "id": id,
+                    "name": campaign_nm,
+                    "keyword": keyword_name,
+                    "cpm_value": item['bids'][0]['cpm'],
+                    "match_type": match_type,
+                    "total_budget": total_budget
+                }
+
+                # Append the report to keyword_report
+                keyword_report.append(keyword_report_dict)
+            else:
+                 match_type1="SMART"
+                 print("smart bid ")
+                 if keyword_name in input_dict[id]['keyword']:
+                     cpm_value = input_dict[id]['bid'][input_dict[id]['keyword'].index(keyword_name)]
+                     if item["bids"][0][match_type]==match_type1:
+                         item["bids"][0]["cpm"]= int(max(cpm_value,keyword_attributes[keyword_name]["min_in_smart"]))
+                     else:
+                         item["bids"][1]["cpm"]= int(max(cpm_value,keyword_attributes[keyword_name]["min_in_smart"]))
+                 else:
+                     if item["bids"][0][match_type]==match_type1:
+                         item["bids"][0]["cpm"]= int(next((item["bids"][0]["cpm"] for item in keywords_list if item["keyword"] == keyword_name), 0))
+                     else:
+                         item["bids"][1]["cpm"]= int(next((item["bids"][1]["cpm"] for item in keywords_list if item["keyword"] == keyword_name), 0))
+             
+                 keywords_list.append({
+                     "keyword": item["keyword"],
+                     "bids":item["bids"]}) 
+                
+         
+         
+           # FOR KEYWORD ADDITION
+         """
+         print("yes")
+         for keyw1 in input_dict[campaign_id]['keyword']:
+            for keyw in keyw1.split(','): 
+             keyw=keyw.strip()
+             is_found=False
+             for item in keywords_list:
+                 if item['keyword']==keyw:
+                     is_found=True
+                     continue
+             
+             if is_found:
+                 continue
+             
+             minimimum_cpm=201
+             maximum_cpm=10000
+             try:
+                 maximum_cpm=keyword_attributes[keyw]["suggested_min_exact"]
+             except:
+                 pass    
+             try:
+                 minimimum_cpm=keyword_attributes[keyw]['min_in_exact']
+             except:
+                 pass
+             
+             if maximum_cpm==10000:
+                 maximum_cpm=301
+             cpm_value=max(minimimum_cpm,maximum_cpm) 
+             print("added keyword is ",keyw," cpm is ",cpm_value)
+             if is_found==False:
+                 keywords_list.append({
+                    "keyword": keyw,
+                    "bids": [{
+                        "match_type": "EXACT",
+                        "cpm": cpm_value,
+                        "max_boost": None
+                    }]
+                })"""
+             
+    
+         #df1=pd.DataFrame(keyword_report)
+         #with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        #  df1.to_excel(writer,sheet_name='keyword_report',index=False)        
+         #print(keywords_list)        
+         #print("Asset Types:", asset_type)
+         #print("Highlighted PIDs:", highlighted_pids)
+         #print("PBIDs:", pbids)
+         #print("Category Bids:", category_ids)
+         #print("Total Budget:", total_budget)
+         #print("Region IDs:", region_ids)
+         #print("Negative Keywords:", negative_keywords)
+         #print("Keywords:", keywords_list)
+         #continue
+         url_validate="https://brands.blinkit.com/adservice/v1/campaigns/schedule/validate"
+         url_campaign ="https://brands.blinkit.com/adservice/v3/campaigns"
+         url_schedule="https://brands.blinkit.com/adservice/v1/campaigns/schedule"
+         data_campaign ={
+             "source_platform": "diy_dashboard_web",
+             "requested_by": "quickcommerce@powerhouse91.com",
+             "advertiser_id": 390,
+             "brand_name": "PH91 Pvt. Ltd",
+             "campaign_id": id,
+             "objective_type": "PERFORMANCE",
+             "asset_type": asset_type,
+             "image_url": "",
+             "header_title": "",
+             "creative_type": "",
+             "brand_ids": "13341",
+             "highlighted_pids": highlighted_pids,
+             "collection_id": "",
+             "brand_page_id": "",
+             "store_name": "",
+             "campaign_data": {
+                 "pids": pbids,
+                 "products":[{"id": pid, "is_star_product": False} for pid in response_data["data"]["campaign"]["pids"]],
+                 "brand_ids": "13341",
+                 "category_ids": category_ids
+             
+             },
+             "campaign_start":campaign_start_date,
+             "campaign_end": "12/31/9999",
+             
+             "infinite_campaign": True,
+             "cpm": 0,
+             "name": campaign_nm,
+             "bidding_strategy": {
+                 "total_budget": int(response_data["data"]["campaign"]["campaign_budget"]),
+                 "pacing_type": "DAILY"
+             },
+             "campaign_targeting": {
+                 "city_ids": region_ids,
+                 "negative_keywords": [],
+                 "keyword_targeting": {
+                     "keywords": keywords_list}
+             },
+             "campaign_request_type": "UPDATE"
+             
+             } 
+         
+         
+         data_validate ={ 
+             "payload":{
+             "source_platform": "diy_dashboard_web",
+             "requested_by": "quickcommerce@powerhouse91.com",
+             "advertiser_id": 390,
+             "brand_name": "PH91 Pvt. Ltd",
+             "campaign_id": id,
+             "objective_type": "PERFORMANCE",
+             "asset_type": asset_type,
+             "image_url": "",
+             "header_title": "",
+             "creative_type": "",
+             "brand_ids": "13341",
+             "highlighted_pids": highlighted_pids,
+             "collection_id": "",
+             "brand_page_id": "",
+             "store_name": "",
+             "campaign_data": {
+                 "pids": pbids,
+                 "products":[{"id": pid, "is_star_product": False} for pid in response_data["data"]["campaign"]["pids"]],
+                 "brand_ids": "13341",
+                 "category_ids": category_ids
+             
+             },
+             "campaign_start":campaign_start_date,
+             "campaign_end": "12/31/9999",
+             "infinite_campaign": True,
+             "cpm": 0,
+             "name": campaign_nm,
+             "bidding_strategy": {
+                 "total_budget": int(response_data["data"]["campaign"]["campaign_budget"]),
+                 "pacing_type": "DAILY"
+             },
+             "campaign_targeting": {
+                 "city_ids": region_ids,
+                 "negative_keywords": [],
+                 "keyword_targeting": {
+                     "keywords": keywords_list}
+             },
+             "campaign_request_type": "UPDATE"
+             },
+             "scheduled_changes": [] 
+             
+             }
+          
+          
+          
+          
+          
+         
+         #continue       
+         #print(data_validate)
+         response_val_raw=requests.post(url_validate, headers=headers, json=data_validate)
+         response_camp_raw=requests.put(url_campaign, headers=headers, json=data_campaign)
+         #print(data_validate)
+         #response_validate=response_val_raw.json()
+         if response_val_raw.status_code == 200 and response_camp_raw.status_code == 200:
+             print("campaign updated successfully]")
+         else:
+             print("error in validation api ",response_val_raw.status_code)
+             print("response_camp_raw ",response_camp_raw.status_code , response_camp_raw.text)
+             message ="response_camp_raw " + response_camp_raw.status_code + response_camp_raw.text
+             output_df.loc[output_df['Campaign Id'] == id, 'status'] = message
+             continue
+         output_df.loc[output_df['Campaign Id'] == id, 'status'] = "successfull" 
+         
+    except:
+        continue
+      
+df1=pd.DataFrame(keyword_report)
+with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        df1.to_excel(writer,sheet_name='keyword_report',index=False)   
+with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        output_df.to_excel(writer,sheet_name='output_report',index=False)                
+
+         
+      
+                
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
